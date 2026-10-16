@@ -1,0 +1,372 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>在线预约系统</title>
+  <style>
+    * { box-sizing: border-box; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      background: #f0f2f5;
+      margin: 0;
+      padding: 20px;
+      display: flex;
+      justify-content: center;
+      align-items: flex-start;
+      min-height: 100vh;
+    }
+    .container {
+      background: #fff;
+      max-width: 520px;
+      width: 100%;
+      border-radius: 12px;
+      box-shadow: 0 4px 20px rgba(0,0,0,0.08);
+      padding: 28px;
+    }
+    h1 {
+      font-size: 22px;
+      text-align: center;
+      color: #1a1a1a;
+      margin-bottom: 24px;
+    }
+    label {
+      display: block;
+      font-size: 14px;
+      color: #555;
+      margin-bottom: 6px;
+      margin-top: 16px;
+    }
+    input, select, textarea {
+      width: 100%;
+      padding: 10px 12px;
+      border: 1px solid #d9d9d9;
+      border-radius: 8px;
+      font-size: 15px;
+      outline: none;
+      transition: border 0.2s;
+    }
+    input:focus, select:focus, textarea:focus {
+      border-color: #1677ff;
+    }
+    button {
+      width: 100%;
+      margin-top: 24px;
+      padding: 12px;
+      background: #1677ff;
+      color: #fff;
+      border: none;
+      border-radius: 8px;
+      font-size: 16px;
+      cursor: pointer;
+      transition: background 0.2s;
+    }
+    button:hover { background: #0958d9; }
+    button:disabled { background: #a0c4ff; cursor: not-allowed; }
+    .message {
+      margin-top: 16px;
+      padding: 10px;
+      border-radius: 8px;
+      font-size: 14px;
+      text-align: center;
+      display: none;
+    }
+    .message.success { background: #e6f7e6; color: #237804; display: block; }
+    .message.error { background: #fff1f0; color: #cf1322; display: block; }
+
+    .booked-panel {
+      margin-top: 24px;
+      border-top: 1px dashed #e8e8e8;
+      padding-top: 16px;
+    }
+    .booked-title {
+      font-size: 15px;
+      color: #333;
+      font-weight: 600;
+      margin-bottom: 10px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .booked-title .refresh {
+      font-size: 13px;
+      color: #1677ff;
+      cursor: pointer;
+      font-weight: normal;
+    }
+    .booked-title .refresh:hover { text-decoration: underline; }
+    .booked-list {
+      max-height: 200px;
+      overflow-y: auto;
+      border: 1px solid #f0f0f0;
+      border-radius: 8px;
+      background: #fafafa;
+    }
+    .booked-item {
+      display: flex;
+      justify-content: space-between;
+      padding: 8px 12px;
+      font-size: 13px;
+      border-bottom: 1px solid #f0f0f0;
+    }
+    .booked-item:last-child { border-bottom: none; }
+    .booked-item .date { color: #333; }
+    .booked-item .time { color: #888; }
+    .booked-empty {
+      padding: 20px;
+      text-align: center;
+      color: #999;
+      font-size: 13px;
+    }
+
+    .date-hint {
+      margin-top: 6px;
+      font-size: 13px;
+      color: #fa8c16;
+      display: none;
+    }
+    .date-hint.show { display: block; }
+
+    select option:disabled {
+      color: #ccc;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>📅 在线预约</h1>
+
+    <label for="date">选择日期</label>
+    <input type="date" id="date" required>
+    <div class="date-hint" id="dateHint"></div>
+
+    <label for="time">选择时间段</label>
+    <select id="time" required>
+      <option value="">请选择时间段</option>
+      <option value="全天">全天</option>
+      <option value="09:00-10:00">09:00 - 10:00</option>
+      <option value="10:00-11:00">10:00 - 11:00</option>
+      <option value="11:00-12:00">11:00 - 12:00</option>
+      <option value="14:00-15:00">14:00 - 15:00</option>
+      <option value="15:00-16:00">15:00 - 16:00</option>
+      <option value="16:00-17:00">16:00 - 17:00</option>
+    </select>
+
+    <label for="name">姓名</label>
+    <input type="text" id="name" placeholder="请输入您的姓名" required>
+
+    <label for="phone">电话</label>
+    <input type="tel" id="phone" placeholder="请输入手机号" required>
+
+    <label for="note">备注（选填）</label>
+    <textarea id="note" rows="3" placeholder="有什么特殊需求可以在这里说明"></textarea>
+
+    <button id="submitBtn" onclick="submitBooking()">提交预约</button>
+    <div id="message" class="message"></div>
+
+    <div class="booked-panel">
+      <div class="booked-title">
+        <span>已预约时段</span>
+        <span class="refresh" onclick="loadBookings()">🔄 刷新</span>
+      </div>
+      <div class="booked-list" id="bookedList">
+        <div class="booked-empty">加载中...</div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // ========== 替换成你的 Apps Script Web App URL ==========
+    const API_URL = '/.netlify/functions/bookings';
+
+    // 所有可选时间段（必须与下拉框中的 value 一致）
+    const ALL_TIMES = [
+      '全天',
+      '09:00-10:00',
+      '10:00-11:00',
+      '11:00-12:00',
+      '14:00-15:00',
+      '15:00-16:00',
+      '16:00-17:00'
+    ];
+
+    let bookedData = [];
+
+    const dateInput = document.getElementById('date');
+    const today = new Date().toISOString().split('T')[0];
+    dateInput.min = today;
+
+    window.addEventListener('DOMContentLoaded', () => {
+      loadBookings();
+      dateInput.addEventListener('change', onDateChange);
+    });
+
+    function formatDate(dateStr) {
+      if (!dateStr) return '';
+      if (/^\d{4}-\d{2}-\d{2}$/.test(dateStr)) return dateStr;
+      const parts = dateStr.split('/');
+      if (parts.length === 3) {
+        return `${parts[0]}-${parts[1].padStart(2, '0')}-${parts[2].padStart(2, '0')}`;
+      }
+      const d = new Date(dateStr);
+      if (!isNaN(d)) {
+        return d.toISOString().split('T')[0];
+      }
+      return dateStr;
+    }
+
+    async function loadBookings() {
+      const listEl = document.getElementById('bookedList');
+      listEl.innerHTML = '<div class="booked-empty">加载中...</div>';
+
+      try {
+        const res = await fetch(API_URL);
+        const rawData = await res.json();
+        bookedData = rawData.map(item => ({
+          ...item,
+          date: formatDate(item.date)
+        }));
+        renderBookedList();
+        updateTimeOptions();
+      } catch (err) {
+        listEl.innerHTML = '<div class="booked-empty">加载失败，请检查网络</div>';
+        console.error('加载预约列表失败:', err);
+      }
+    }
+
+    function renderBookedList() {
+      const listEl = document.getElementById('bookedList');
+      if (!bookedData || bookedData.length === 0) {
+        listEl.innerHTML = '<div class="booked-empty">暂无预约记录</div>';
+        return;
+      }
+      const sorted = [...bookedData].sort((a, b) => {
+        if (a.date !== b.date) return a.date.localeCompare(b.date);
+        return a.time.localeCompare(b.time);
+      });
+      listEl.innerHTML = sorted.map(item => `
+        <div class="booked-item">
+          <span class="date">${item.date}</span>
+          <span class="time">${item.time}</span>
+        </div>
+      `).join('');
+    }
+
+    function updateTimeOptions() {
+      const date = dateInput.value;
+      const timeSelect = document.getElementById('time');
+      const hintEl = document.getElementById('dateHint');
+
+      const currentValue = timeSelect.value;
+
+      // 该日期所有已预约时段
+      const bookedTimes = bookedData
+        .filter(item => item.date === date)
+        .map(item => item.time);
+
+      const hasFullDay = bookedTimes.includes('全天');
+      const hasPartial = bookedTimes.some(t => t !== '全天');
+
+      // 更新每个 option 的 disabled 状态
+      Array.from(timeSelect.options).forEach(opt => {
+        if (!opt.value) return; // 跳过“请选择”
+        let disabled = false;
+        let label = opt.value;
+
+        if (opt.value === '全天') {
+          // 如果已有任意预约（全天或部分时段），全天不可选
+          if (hasFullDay || hasPartial) {
+            disabled = true;
+            label = '全天（已约）';
+          }
+        } else {
+          // 具体时段：如果已有全天预约，则不可选；如果该时段本身已被约，也不可选
+          if (hasFullDay || bookedTimes.includes(opt.value)) {
+            disabled = true;
+            label = opt.value + '（已约）';
+          }
+        }
+
+        opt.disabled = disabled;
+        opt.textContent = label;
+      });
+
+      // 如果当前选中的已被禁用，清空
+      const currentOpt = Array.from(timeSelect.options).find(o => o.value === currentValue);
+      if (currentOpt && currentOpt.disabled) {
+        timeSelect.value = '';
+      }
+
+      // 提示
+      if (date && bookedTimes.length > 0) {
+        if (hasFullDay) {
+          hintEl.textContent = '该日期已被预约（全天）';
+        } else {
+          hintEl.textContent = `该日期已有 ${bookedTimes.length} 个时段被预约`;
+        }
+        hintEl.classList.add('show');
+      } else {
+        hintEl.classList.remove('show');
+      }
+    }
+
+    function onDateChange() {
+      updateTimeOptions();
+    }
+
+    async function submitBooking() {
+      const date = document.getElementById('date').value;
+      const time = document.getElementById('time').value;
+      const name = document.getElementById('name').value.trim();
+      const phone = document.getElementById('phone').value.trim();
+      const note = document.getElementById('note').value.trim();
+      const btn = document.getElementById('submitBtn');
+
+      if (!date || !time || !name || !phone) {
+        showMessage('请填写完整信息', 'error');
+        return;
+      }
+      if (!/^1[3-9]\d{9}$/.test(phone)) {
+        showMessage('请输入正确的手机号', 'error');
+        return;
+      }
+
+      btn.disabled = true;
+      btn.textContent = '提交中...';
+
+      try {
+        const res = await fetch(API_URL, {
+          method: 'POST',
+          mode: 'cors',
+          headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+          body: JSON.stringify({ date, time, name, phone, note })
+        });
+        const result = await res.json();
+
+        if (result.success) {
+          showMessage(result.message, 'success');
+          document.getElementById('name').value = '';
+          document.getElementById('phone').value = '';
+          document.getElementById('note').value = '';
+          await loadBookings();
+        } else {
+          showMessage(result.message, 'error');
+        }
+      } catch (err) {
+        showMessage('网络错误，请稍后重试', 'error');
+        console.error(err);
+      } finally {
+        btn.disabled = false;
+        btn.textContent = '提交预约';
+      }
+    }
+
+    function showMessage(text, type) {
+      const el = document.getElementById('message');
+      el.textContent = text;
+      el.className = 'message ' + type;
+      setTimeout(() => { el.className = 'message'; }, 4000);
+    }
+  </script>
+</body>
+</html>
