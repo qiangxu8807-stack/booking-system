@@ -28,51 +28,67 @@ export const handler = async (event) => {
       return { statusCode: 400, headers, body: JSON.stringify({ success: false, message: '请求格式错误' }) };
     }
 
-    const { platform, device, date, time, name, phone, note } = data;
+    const { platform, devices, date, time, name, phone, note } = data;
 
-    if (!platform || !device || !date || !time || !name || !phone) {
+    if (!platform || !devices || !devices.length || !date || !time || !name || !phone) {
       return { statusCode: 200, headers, body: JSON.stringify({ success: false, message: '信息不完整' }) };
     }
 
     const list = (await store.get('all', { type: 'json' })) || [];
 
-    // 检查同一平台+同一设备+同一天的冲突
-    const sameCombo = list.filter(b =>
-      b.platform === platform && b.device === device && b.date === date
-    );
-    const hasFullDay = sameCombo.some(b => b.time === '全天');
-    const hasPartial = sameCombo.some(b => b.time !== '全天');
-    const timeTaken = sameCombo.some(b => b.time === time);
+    // 检查所有选中设备是否都空闲
+    const conflicts = [];
+    for (const device of devices) {
+      const sameCombo = list.filter(b =>
+        b.platform === platform && b.device === device && b.date === date
+      );
+      const hasFullDay = sameCombo.some(b => b.time === '全天');
+      const hasPartial = sameCombo.some(b => b.time !== '全天');
+      const timeTaken = sameCombo.some(b => b.time === time);
 
-    const comboLabel = `${platform} 平台的 ${device}`;
-
-    if (time === '全天') {
-      if (hasFullDay || hasPartial) {
-        return { statusCode: 200, headers, body: JSON.stringify({ success: false, message: `${comboLabel} 该日期已有预约，无法预约全天` }) };
-      }
-    } else {
-      if (hasFullDay) {
-        return { statusCode: 200, headers, body: JSON.stringify({ success: false, message: `${comboLabel} 该日期已被预约全天` }) };
-      }
-      if (timeTaken) {
-        return { statusCode: 200, headers, body: JSON.stringify({ success: false, message: `${comboLabel} 该时段已被预约` }) };
+      if (time === '全天') {
+        if (hasFullDay || hasPartial) conflicts.push(device);
+      } else {
+        if (hasFullDay || timeTaken) conflicts.push(device);
       }
     }
 
-    list.push({
-      platform,
-      device,
-      date,
-      time,
-      name,
-      phone,
-      note: note || '',
-      createdAt: new Date().toISOString()
-    });
+    if (conflicts.length) {
+      return {
+        statusCode: 200,
+        headers,
+        body: JSON.stringify({
+          success: false,
+          message: `以下设备在该时段已被预约：${conflicts.join('、')}`
+        })
+      };
+    }
+
+    // 为每台选中设备追加一条记录
+    const now = new Date().toISOString();
+    for (const device of devices) {
+      list.push({
+        platform,
+        device,
+        date,
+        time,
+        name,
+        phone,
+        note: note || '',
+        createdAt: now
+      });
+    }
 
     await store.setJSON('all', list);
 
-    return { statusCode: 200, headers, body: JSON.stringify({ success: true, message: `预约成功！${comboLabel} · ${date} · ${time}` }) };
+    return {
+      statusCode: 200,
+      headers,
+      body: JSON.stringify({
+        success: true,
+        message: `预约成功！共 ${devices.length} 台设备`
+      })
+    };
   }
 
   return { statusCode: 405, headers, body: 'Method Not Allowed' };
