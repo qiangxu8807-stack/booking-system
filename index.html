@@ -45,11 +45,15 @@
     .platform-header { background: linear-gradient(90deg, #e6f4ff, #f0f9ff); padding: 10px 14px; font-size: 14px; font-weight: 600; color: #0958d9; display: flex; justify-content: space-between; align-items: center; }
     .platform-header .count { color: #1677ff; font-weight: normal; font-size: 12px; background: #fff; padding: 2px 8px; border-radius: 10px; }
     .platform-body { max-height: 180px; overflow-y: auto; }
-    .record { padding: 8px 14px; font-size: 13px; border-bottom: 1px solid #f5f5f5; display: grid; grid-template-columns: 1.2fr 1fr 1fr; gap: 8px; align-items: center; }
+    
+    /* 🌟 核心修改：将原来的 3 列改为 4 列，给姓名留出空间 */
+    .record { padding: 8px 14px; font-size: 13px; border-bottom: 1px solid #f5f5f5; display: grid; grid-template-columns: 1.5fr 1fr 1fr 0.8fr; gap: 8px; align-items: center; }
+    
     .record:last-child { border-bottom: none; }
     .record .device { color: #333; font-weight: 500; }
     .record .date { color: #555; }
     .record .time { color: #888; }
+    .record .name { color: #1677ff; font-weight: bold; text-align: right; } /* 姓名蓝色加粗靠右 */
     .empty { padding: 20px; text-align: center; color: #999; font-size: 13px; }
     .hint { margin-top: 6px; font-size: 13px; color: #fa8c16; display: none; }
     .hint.show { display: block; }
@@ -113,7 +117,7 @@
       { id: '5-EVEXIA', name: '5-EVEXIA' }
     ];
 
-       const DEVICES = [
+    const DEVICES = [
       { id: 'keysight-c', name: 'Keysight C-band' },
       { id: 'santec-o', name: 'Santec O-band' },
       { id: 'lca-67g', name: '67G LCA' },
@@ -267,6 +271,8 @@
                   <span class="device">${deviceName(r.device)}</span>
                   <span class="date">${r.date}</span>
                   <span class="time">${r.time}</span>
+                  <!-- 🌟 核心修改：这里是新增的姓名列 -->
+                  <span class="name">${r.name || '-'}</span>
                 </div>
               `).join('')}
             </div>
@@ -294,7 +300,6 @@
         return;
       }
 
-      // 对每个时段，检查所有选中设备是否都空闲
       const takenTimes = new Set();
       const fullDayDevices = new Set();
       const partialDevices = new Set();
@@ -317,10 +322,8 @@
         let dis = false, txt = o.value;
 
         if (o.value === '全天') {
-          // 只要有任意选中设备当天已有预约，全天就不可选
           if (takenTimes.size > 0) { dis = true; txt = '全天（已约）'; }
         } else {
-          // 具体时段：如果某设备已约全天，或者该时段已被某设备约走，禁用
           if (anyFullDay) { dis = true; txt = o.value + '（已约）'; }
           else {
             const conflict = selectedDevices.some(device =>
@@ -339,7 +342,6 @@
       const curOpt = Array.from(sel.options).find(o => o.value === cur);
       if (curOpt && curOpt.disabled) sel.value = '';
 
-      // 提示信息
       const totalRecords = bookedData.filter(i =>
         i.platform === selectedPlatform && i.date === d && selectedDevices.includes(i.device)
       ).length;
