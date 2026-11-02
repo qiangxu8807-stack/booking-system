@@ -18,7 +18,7 @@ export default async function handler(req, res) {
     // 1. 处理 GET 请求（获取预约列表）
     if (req.method === 'GET') {
       const response = await fetch(url, {
-        headers: { 'X-Master-Key': API_KEY } // 如果你用的是 Access Key，请改成 'X-Access-Key'
+        headers: { 'X-Access-Key': API_KEY } // 已改为 Access Key
       });
       const data = await response.json();
       return res.status(200).json(data.record || []);
@@ -29,13 +29,13 @@ export default async function handler(req, res) {
       const { platform, devices, date, time, name, phone, note } = req.body;
 
       // 获取当前所有数据
-      const getRes = await fetch(`${url.replace('/latest', '')}/latest`, {
-        headers: { 'X-Master-Key': API_KEY } // 同上，注意 Key 类型
+      const getRes = await fetch(`${url}/latest`, {
+        headers: { 'X-Access-Key': API_KEY } // 已改为 Access Key
       });
       const getJson = await getRes.json();
       const currentRecords = getJson.record || [];
 
-      // 检查冲突（虽然前端做了禁用，但后端必须再查一次，防止多人同时提交冲突）
+      // 检查冲突
       for (const device of devices) {
         const conflict = currentRecords.some(r => 
           r.platform === platform && 
@@ -48,7 +48,6 @@ export default async function handler(req, res) {
         }
       }
 
-      // 生成新记录（按照你的前端逻辑，一个设备一条记录）
       const newRecords = devices.map(device => ({
         id: Date.now().toString() + Math.random().toString(36).substring(2, 6),
         platform,
@@ -67,7 +66,7 @@ export default async function handler(req, res) {
         method: 'PUT',
         headers: { 
           'Content-Type': 'application/json',
-          'X-Master-Key': API_KEY 
+          'X-Access-Key': API_KEY // 已改为 Access Key
         },
         body: JSON.stringify(updatedRecords)
       });
