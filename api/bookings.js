@@ -15,16 +15,19 @@ export default async function handler(req, res) {
   }
 
   try {
-    // 1. 处理 GET 请求（获取预约列表）
+    // 1. 处理 GET 请求
     if (req.method === 'GET') {
       const response = await fetch(url, {
-        headers: { 'X-Access-Key': API_KEY } // 注意：确保这里与你填的 Key 类型一致
+        headers: { 'X-Access-Key': API_KEY }
       });
       const data = await response.json();
-      return res.status(200).json(data.record || []);
+      
+      // 🟢 安全检查：确保返回的一定是数组
+      const records = Array.isArray(data.record) ? data.record : [];
+      return res.status(200).json(records);
     }
 
-    // 2. 处理 POST 请求（提交新预约）
+    // 2. 处理 POST 请求
     if (req.method === 'POST') {
       const { platform, devices, date, time, name, phone, note } = req.body;
 
@@ -32,7 +35,9 @@ export default async function handler(req, res) {
         headers: { 'X-Access-Key': API_KEY }
       });
       const getJson = await getRes.json();
-      const currentRecords = getJson.record || [];
+      
+      // 🟢 安全检查：确保拿到的一定是数组
+      const currentRecords = Array.isArray(getJson.record) ? getJson.record : [];
 
       for (const device of devices) {
         const conflict = currentRecords.some(r => 
@@ -73,20 +78,19 @@ export default async function handler(req, res) {
       return res.status(200).json({ success: true, message: '预约成功！' });
     }
 
-    // 3. 🟢 新增：处理 DELETE 请求（取消预约）
+    // 3. 处理 DELETE 请求
     if (req.method === 'DELETE') {
-      // 从 URL 获取要取消的记录 ID (例如: /api/bookings?id=xxx)
       const { id } = req.query;
-
       if (!id) return res.status(400).json({ success: false, message: '缺少预约ID' });
 
       const getRes = await fetch(`${url}/latest`, {
         headers: { 'X-Access-Key': API_KEY }
       });
       const getJson = await getRes.json();
-      const currentRecords = getJson.record || [];
+      
+      // 🟢 安全检查
+      const currentRecords = Array.isArray(getJson.record) ? getJson.record : [];
 
-      // 过滤掉要取消的那条记录
       const updatedRecords = currentRecords.filter(r => r.id !== id);
 
       if (currentRecords.length === updatedRecords.length) {
