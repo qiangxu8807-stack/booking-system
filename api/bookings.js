@@ -1,7 +1,7 @@
 // api/bookings.js
 export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
-  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
+  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, DELETE, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
 
   if (req.method === 'OPTIONS') return res.status(200).end();
@@ -18,7 +18,7 @@ export default async function handler(req, res) {
     // 1. 处理 GET 请求（获取预约列表）
     if (req.method === 'GET') {
       const response = await fetch(url, {
-        headers: { 'X-Access-Key': API_KEY } // 已改为 Access Key
+        headers: { 'X-Access-Key': API_KEY } // 注意：确保这里与你填的 Key 类型一致
       });
       const data = await response.json();
       return res.status(200).json(data.record || []);
@@ -28,14 +28,12 @@ export default async function handler(req, res) {
     if (req.method === 'POST') {
       const { platform, devices, date, time, name, phone, note } = req.body;
 
-      // 获取当前所有数据
       const getRes = await fetch(`${url}/latest`, {
-        headers: { 'X-Access-Key': API_KEY } // 已改为 Access Key
+        headers: { 'X-Access-Key': API_KEY }
       });
       const getJson = await getRes.json();
       const currentRecords = getJson.record || [];
 
-      // 检查冲突
       for (const device of devices) {
         const conflict = currentRecords.some(r => 
           r.platform === platform && 
@@ -61,12 +59,11 @@ export default async function handler(req, res) {
 
       const updatedRecords = [...currentRecords, ...newRecords];
 
-      // 保存回 JSONBin
       const putRes = await fetch(url, {
         method: 'PUT',
         headers: { 
           'Content-Type': 'application/json',
-          'X-Access-Key': API_KEY // 已改为 Access Key
+          'X-Access-Key': API_KEY 
         },
         body: JSON.stringify(updatedRecords)
       });
@@ -75,6 +72,41 @@ export default async function handler(req, res) {
 
       return res.status(200).json({ success: true, message: '预约成功！' });
     }
+
+    // 3. 🟢 新增：处理 DELETE 请求（取消预约）
+    if (req.method === 'DELETE') {
+      // 从 URL 获取要取消的记录 ID (例如: /api/bookings?id=xxx)
+      const { id } = req.query;
+
+      if (!id) return res.status(400).json({ success: false, message: '缺少预约ID' });
+
+      const getRes = await fetch(`${url}/latest`, {
+        headers: { 'X-Access-Key': API_KEY }
+      });
+      const getJson = await getRes.json();
+      const currentRecords = getJson.record || [];
+
+      // 过滤掉要取消的那条记录
+      const updatedRecords = currentRecords.filter(r => r.id !== id);
+
+      if (currentRecords.length === updatedRecords.length) {
+        return res.status(404).json({ success: false, message: '找不到该预约记录，可能已被取消' });
+      }
+
+      const putRes = await fetch(url, {
+        method: 'PUT',
+        headers: { 
+          'Content-Type': 'application/json',
+          'X-Access-Key': API_KEY 
+        },
+        body: JSON.stringify(updatedRecords)
+      });
+
+      if (!putRes.ok) throw new Error('取消预约失败');
+
+      return res.status(200).json({ success: true, message: '已成功取消预约' });
+    }
+
   } catch (error) {
     return res.status(500).json({ success: false, message: error.message });
   }
