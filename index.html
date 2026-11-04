@@ -110,11 +110,11 @@
       <div class="panel-title">
         <div class="filter-group">
           <span>预约记录</span>
-          <!-- 新增：时间视图筛选器 -->
+          <!-- 更新：时间视图筛选器 -->
           <select id="viewFilter" class="filter-select" onchange="changeView()">
-            <option value="recent">最近7天及未来</option>
-            <option value="all">全部记录</option>
-            <option value="history">历史记录 (7天前)</option>
+            <option value="recent">最近七天及未来</option>
+            <option value="future">未来</option>
+            <option value="history">历史记录</option>
           </select>
         </div>
         <span class="refresh" onclick="loadBookings()">🔄 刷新</span>
@@ -155,7 +155,7 @@
     let bookedData = [];
     let selectedPlatform = '';
     let selectedDevices = [];
-    let currentView = 'recent'; // 默认视图：最近7天及未来
+    let currentView = 'recent'; // 默认视图：最近七天及未来
 
     const dateInput = document.getElementById('date');
     dateInput.min = new Date().toISOString().split('T')[0];
@@ -259,7 +259,7 @@
       }
     }
 
-    // 🌟 核心修改：根据下拉框的视图进行过滤和渲染
+    // 🌟 核心修改：根据下拉框的新视图进行过滤和渲染
     function renderList() {
       const listEl = document.getElementById('list');
       if (!bookedData.length) {
@@ -277,20 +277,25 @@
         const day = String(d.getDate()).padStart(2, '0');
         return `${year}-${month}-${day}`;
       };
+      
+      const todayStr = format(today);
       const sevenDaysAgoStr = format(sevenDaysAgo);
 
       let displayData = [];
       let emptyText = '';
 
       if (currentView === 'recent') {
+        // 过去 7 天 + 今天 + 未来
         displayData = bookedData.filter(i => i.date >= sevenDaysAgoStr);
-        emptyText = '最近 7 天及未来暂无预约记录';
+        emptyText = '最近七天及未来暂无预约记录';
+      } else if (currentView === 'future') {
+        // 仅今天 + 未来
+        displayData = bookedData.filter(i => i.date >= todayStr);
+        emptyText = '未来暂无预约记录';
       } else if (currentView === 'history') {
+        // 7天之前（不含最近7天）
         displayData = bookedData.filter(i => i.date < sevenDaysAgoStr);
-        emptyText = '7 天前暂无历史记录';
-      } else {
-        displayData = [...bookedData];
-        emptyText = '暂无预约记录';
+        emptyText = '7天前暂无历史记录';
       }
 
       if (!displayData.length) {
