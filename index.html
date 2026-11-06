@@ -22,6 +22,7 @@
     .btn-grid { display: grid; gap: 8px; margin-top: 6px; }
     .btn-grid.platforms { grid-template-columns: repeat(auto-fill, minmax(100px, 1fr)); }
     .btn-grid.devices { grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); }
+    .btn-grid.consumables { grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); }
     .sel-btn { padding: 10px 8px; border: 2px solid #d9d9d9; border-radius: 8px; background: #fff; text-align: center; cursor: pointer; font-size: 13px; transition: all 0.15s; user-select: none; line-height: 1.4; position: relative; }
     .sel-btn:hover { border-color: #91caff; }
     .sel-btn.active { border-color: #1677ff; background: #e6f4ff; color: #0958d9; font-weight: 600; }
@@ -50,9 +51,9 @@
     .record:last-child { border-bottom: none; }
     
     .record-left { flex: 1; display: flex; flex-direction: column; gap: 8px; }
-    .record-row { display: flex; align-items: center; gap: 8px; }
-    .record-row .label { font-size: 12px; color: #8c8c8c; width: 32px; flex-shrink: 0; }
-    .record-row .value { color: #333; font-weight: 500; }
+    .record-row { display: flex; align-items: flex-start; gap: 8px; }
+    .record-row .label { font-size: 12px; color: #8c8c8c; width: 40px; flex-shrink: 0; margin-top: 2px; }
+    .record-row .value { color: #333; font-weight: 500; line-height: 1.5; }
     
     .record-right { text-align: right; display: flex; flex-direction: column; align-items: flex-end; gap: 8px; min-width: 100px; }
     .record-right .name { color: #1677ff; font-weight: 600; font-size: 15px; }
@@ -75,6 +76,9 @@
 
     <label>选择设备（可多选）</label>
     <div class="btn-grid devices" id="deviceGrid"></div>
+
+    <label>选择耗材（可多选）</label>
+    <div class="btn-grid consumables" id="consumableGrid"></div>
 
     <div class="current-sel" id="currentSel"></div>
 
@@ -110,7 +114,6 @@
       <div class="panel-title">
         <div class="filter-group">
           <span>预约记录</span>
-          <!-- 更新：时间视图筛选器 -->
           <select id="viewFilter" class="filter-select" onchange="changeView()">
             <option value="recent">最近七天及未来</option>
             <option value="future">未来</option>
@@ -147,7 +150,29 @@
       { id: 'keithley-2400-2', name: 'Keithley 2400 #2' },
       { id: 'keithley-2400-3', name: 'Keithley 2400 #3' },
       { id: 'keithley-2400-4', name: 'Keithley 2400 #4' },
-      { id: 'keithley-2400-5', name: 'Keithley 2400 #5' }
+      { id: 'keithley-2400-5', name: 'Keithley 2400 #5' },
+      // 新增设备
+      { id: 'anyang-laser', name: '安阳激光器' },
+      { id: 'dc-source', name: '可编程直流电压源' },
+      { id: 'func-gen', name: '函数发生器' },
+      { id: 'biasT', name: 'BiasT' },
+      { id: 'rf-amp', name: 'RF放大器' }
+    ];
+
+    const CONSUMABLES = [
+      { id: 'dc-probe', name: '直流探针' },
+      { id: 'rf-gsg-67g', name: '射频探针 GSG-67G' },
+      { id: 'rf-gs-67g', name: '射频探针 GS-67G' },
+      { id: 'rf-gsgsg-67g', name: '射频探针 GSGSG-67G' },
+      { id: 'rf-110g-1', name: '射频探针 110G #1' },
+      { id: 'rf-110g-2', name: '射频探针 110G #2' },
+      { id: 'rf-110g-3', name: '射频探针 110G #3' },
+      { id: 'cal-67g', name: '67G校准片' },
+      { id: 'cal-110g', name: '110G校准片' },
+      { id: 'fiber-smf28', name: '光纤 单模SMF28' },
+      { id: 'fiber-lens-2.5', name: '光纤 透镜LENS 2.5' },
+      { id: 'fiber-lens-6', name: '光纤 透镜LENS 6' },
+      { id: 'fiber-lens-other', name: '光纤 透镜LENS 其他' }
     ];
 
     const API_URL = '/api/bookings';
@@ -155,7 +180,8 @@
     let bookedData = [];
     let selectedPlatform = '';
     let selectedDevices = [];
-    let currentView = 'recent'; // 默认视图：最近七天及未来
+    let selectedConsumables = []; // 新增耗材状态
+    let currentView = 'recent'; 
 
     const dateInput = document.getElementById('date');
     dateInput.min = new Date().toISOString().split('T')[0];
@@ -163,11 +189,11 @@
     window.addEventListener('DOMContentLoaded', () => {
       renderPlatformButtons();
       renderDeviceButtons();
+      renderConsumableButtons(); // 初始化耗材按钮
       loadBookings();
       dateInput.addEventListener('change', updateOptions);
     });
 
-    // 切换视图触发重新渲染
     function changeView() {
       currentView = document.getElementById('viewFilter').value;
       renderList();
@@ -182,6 +208,12 @@
     function renderDeviceButtons() {
       document.getElementById('deviceGrid').innerHTML = DEVICES.map(d =>
         `<div class="sel-btn" data-id="${d.id}" onclick="toggleDevice('${d.id}')">${d.name}</div>`
+      ).join('');
+    }
+
+    function renderConsumableButtons() {
+      document.getElementById('consumableGrid').innerHTML = CONSUMABLES.map(c =>
+        `<div class="sel-btn" data-id="${c.id}" onclick="toggleConsumable('${c.id}')">${c.name}</div>`
       ).join('');
     }
 
@@ -208,6 +240,20 @@
       updateOptions();
     }
 
+    // 新增耗材选择逻辑
+    function toggleConsumable(id) {
+      const idx = selectedConsumables.indexOf(id);
+      if (idx >= 0) {
+        selectedConsumables.splice(idx, 1);
+      } else {
+        selectedConsumables.push(id);
+      }
+      document.querySelectorAll('#consumableGrid .sel-btn').forEach(el => {
+        el.classList.toggle('active', selectedConsumables.includes(el.dataset.id));
+      });
+      refreshCurrentSel();
+    }
+
     function platformName(id) {
       const p = PLATFORMS.find(x => x.id === id);
       return p ? p.name : id;
@@ -218,17 +264,33 @@
       return d ? d.name : id;
     }
 
+    function consumableName(id) {
+      const c = CONSUMABLES.find(x => x.id === id);
+      return c ? c.name : id;
+    }
+
     function refreshCurrentSel() {
       const el = document.getElementById('currentSel');
-      if (selectedPlatform && selectedDevices.length) {
+      let html = '';
+      
+      if (selectedPlatform) {
+        html += `平台：<b>${platformName(selectedPlatform)}</b> `;
+      } else {
+        html += `平台：<span style="color:#fa8c16">未选择</span> `;
+      }
+
+      if (selectedDevices.length) {
         const names = selectedDevices.map(d => deviceName(d)).join('、');
-        el.innerHTML = `当前选择：<b>${platformName(selectedPlatform)}</b> 平台 · 设备（${selectedDevices.length}）：<b>${names}</b>`;
-        el.classList.add('show');
-      } else if (selectedPlatform) {
-        el.innerHTML = `当前选择：<b>${platformName(selectedPlatform)}</b> 平台（请选择设备）`;
-        el.classList.add('show');
-      } else if (selectedDevices.length) {
-        el.innerHTML = `已选设备（${selectedDevices.length}）：<b>${selectedDevices.map(d => deviceName(d)).join('、')}</b>（请选择平台）`;
+        html += `| 设备：<b>${names}</b> `;
+      }
+
+      if (selectedConsumables.length) {
+        const names = selectedConsumables.map(c => consumableName(c)).join('、');
+        html += `| 耗材：<b>${names}</b>`;
+      }
+
+      if (selectedPlatform || selectedDevices.length || selectedConsumables.length) {
+        el.innerHTML = html;
         el.classList.add('show');
       } else {
         el.classList.remove('show');
@@ -259,7 +321,6 @@
       }
     }
 
-    // 🌟 核心修改：根据下拉框的新视图进行过滤和渲染
     function renderList() {
       const listEl = document.getElementById('list');
       if (!bookedData.length) {
@@ -285,15 +346,12 @@
       let emptyText = '';
 
       if (currentView === 'recent') {
-        // 过去 7 天 + 今天 + 未来
         displayData = bookedData.filter(i => i.date >= sevenDaysAgoStr);
         emptyText = '最近七天及未来暂无预约记录';
       } else if (currentView === 'future') {
-        // 仅今天 + 未来
         displayData = bookedData.filter(i => i.date >= todayStr);
         emptyText = '未来暂无预约记录';
       } else if (currentView === 'history') {
-        // 7天之前（不含最近7天）
         displayData = bookedData.filter(i => i.date < sevenDaysAgoStr);
         emptyText = '7天前暂无历史记录';
       }
@@ -303,11 +361,44 @@
         return;
       }
 
+      // 🌟 数据聚合：按人、时间、平台合并，并聚合设备和耗材
+      const groupedMap = {};
+      displayData.forEach(r => {
+        const key = `${r.platform}_${r.date}_${r.time}_${r.name}_${r.phone}`;
+        if (!groupedMap[key]) {
+          groupedMap[key] = {
+            platform: r.platform,
+            date: r.date,
+            time: r.time,
+            name: r.name,
+            phone: r.phone,
+            devices: [],
+            consumables: [], // 初始化耗材列表
+            ids: []
+          };
+        }
+        
+        // 聚合设备
+        groupedMap[key].devices.push(deviceName(r.device));
+        
+        // 聚合耗材 (如果有且不重复)
+        if (r.consumables && Array.isArray(r.consumables)) {
+          r.consumables.forEach(c => {
+            if (!groupedMap[key].consumables.includes(c)) {
+              groupedMap[key].consumables.push(c);
+            }
+          });
+        }
+        
+        groupedMap[key].ids.push(r.id);
+      });
+      
+      const groupedData = Object.values(groupedMap);
+
       let html = '';
       PLATFORMS.forEach(p => {
-        const records = displayData
+        const records = groupedData
           .filter(i => i.platform === p.id)
-          // 排序：最新的日期在最上面 (降序)
           .sort((a, b) => b.date.localeCompare(a.date) || b.time.localeCompare(a.time));
 
         if (!records.length) return;
@@ -324,8 +415,14 @@
                   <div class="record-left">
                     <div class="record-row">
                       <span class="label">设备</span>
-                      <span class="value">${deviceName(r.device)}</span>
+                      <span class="value">${r.devices.join('、')}</span>
                     </div>
+                    ${r.consumables.length > 0 ? `
+                    <div class="record-row">
+                      <span class="label">耗材</span>
+                      <span class="value" style="color: #555; font-weight: normal;">${r.consumables.map(c => consumableName(c)).join('、')}</span>
+                    </div>
+                    ` : ''}
                     <div class="record-row">
                       <span class="label">时间</span>
                       <span class="value" style="color: #555; font-weight: normal;">${r.date} ${r.time}</span>
@@ -334,7 +431,7 @@
                   <div class="record-right">
                     <div class="name">${r.name || '-'}</div>
                     <div class="phone">${r.phone || ''}</div>
-                    <button class="btn-cancel-rec" onclick="cancelBooking('${r.id}', '${r.name}')">取消预约</button>
+                    <button class="btn-cancel-rec" onclick="cancelBooking('${r.ids.join(',')}', '${r.name}')">取消预约</button>
                   </div>
                 </div>
               `).join('')}
@@ -346,21 +443,22 @@
       listEl.innerHTML = html;
     }
 
-    async function cancelBooking(id, name) {
-      if (!confirm(`确定要取消【${name}】的这条预约吗？`)) return;
+    async function cancelBooking(idsStr, name) {
+      if (!confirm(`确定要取消【${name}】的这条预约（包含多台设备）吗？`)) return;
 
+      const ids = idsStr.split(',');
       try {
-        const res = await fetch(`${API_URL}?id=${id}`, { method: 'DELETE' });
-        const result = await res.json();
-        
-        if (result.success) {
-          showMsg(result.message, 'success');
-          await loadBookings();
-        } else {
-          showMsg(result.message, 'error');
+        for (const id of ids) {
+          const res = await fetch(`${API_URL}?id=${id}`, { method: 'DELETE' });
+          const result = await res.json();
+          if (!result.success) {
+            throw new Error(result.message || '取消失败');
+          }
         }
+        showMsg('已成功取消该预约', 'success');
+        await loadBookings();
       } catch (e) {
-        showMsg('网络错误，取消失败', 'error');
+        showMsg(e.message || '网络错误，取消失败', 'error');
       }
     }
 
@@ -385,7 +483,6 @@
       const partialDevices = new Set();
 
       selectedDevices.forEach(device => {
-        // 冲突检测始终基于全量 bookedData 数据
         const records = bookedData.filter(i =>
           i.platform === selectedPlatform && i.device === device && i.date === d
         );
@@ -458,6 +555,7 @@
           body: JSON.stringify({
             platform: selectedPlatform,
             devices: selectedDevices,
+            consumables: selectedConsumables, // 提交耗材数据
             date, time, name, phone, note
           })
         });
@@ -468,6 +566,12 @@
           document.getElementById('name').value = '';
           document.getElementById('phone').value = '';
           document.getElementById('note').value = '';
+          // 提交后清空耗材和设备的选中状态
+          selectedDevices = [];
+          selectedConsumables = [];
+          document.querySelectorAll('#deviceGrid .sel-btn, #consumableGrid .sel-btn').forEach(el => el.classList.remove('active'));
+          refreshCurrentSel();
+          
           await loadBookings();
         } else {
           showMsg(result.message, 'error');
