@@ -21,8 +21,8 @@
 
     .btn-grid { display: grid; gap: 8px; margin-top: 6px; }
     .btn-grid.platforms { grid-template-columns: repeat(auto-fill, minmax(100px, 1fr)); }
-    .btn-grid.devices { grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); }
-    .btn-grid.consumables { grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); }
+    .btn-grid.devices { grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); }
+    .btn-grid.consumables { grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); }
     .sel-btn { padding: 10px 8px; border: 2px solid #d9d9d9; border-radius: 8px; background: #fff; text-align: center; cursor: pointer; font-size: 13px; transition: all 0.15s; user-select: none; line-height: 1.4; position: relative; }
     .sel-btn:hover { border-color: #91caff; }
     .sel-btn.active { border-color: #1677ff; background: #e6f4ff; color: #0958d9; font-weight: 600; }
@@ -136,12 +136,13 @@
     ];
 
     const DEVICES = [
-      { id: 'keysight-c', name: 'Keysight C-band' },
-      { id: 'santec-o', name: 'Santec O-band' },
+      { id: 'keysight-c', name: 'Keysight C-band (≤8dBm)' },
+      { id: 'santec-o', name: 'Santec O-band (≤13dBm)' },
       { id: 'lca-67g', name: '67G LCA' },
       { id: 'lca-110g', name: '110G LCA' },
-      { id: 'edfa', name: 'EDFA' },
-      { id: 'pdfa', name: 'PDFA' },
+      { id: 'edfa', name: 'EDFA (1550nm)' },
+      { id: 'edfa', name: 'EDFA (1620nm)' },
+      { id: 'pdfa', name: 'PDFA(1310nm)' },
       { id: 'yoko-6370', name: 'Yokogawa 6370' },
       { id: 'yoko-6377', name: 'Yokogawa 6377' },
       { id: 'yoko-6380', name: 'Yokogawa 6380' },
@@ -164,8 +165,9 @@
       { id: 'rf-gsg-67g', name: '射频探针 GSG-67G' },
       { id: 'rf-gs-67g', name: '射频探针 GS-67G' },
       { id: 'rf-gsgsg-67g', name: '射频探针 GSGSG-67G' },
-      { id: 'rf-gsg-110g', name: '射频探针 GSG-67G' },
-      { id: 'rf-gs-110g', name: '射频探针 GS-67G' },
+      { id: 'rf-gsg-110g', name: '射频探针 GSG-110G' },
+      { id: 'rf-gs-110g', name: '射频探针 GS-110G' },
+      { id: 'rf-gsgsg-110g', name: '射频探针 GSGSG-110G' },
       { id: 'cal-67g', name: '校准片-67G' },
       { id: 'cal-110g', name: '校准片-110G' },
       { id: 'fiber-smf28', name: '光纤 单模SMF28' },
@@ -179,7 +181,7 @@
     let bookedData = [];
     let selectedPlatform = '';
     let selectedDevices = [];
-    let selectedConsumables = []; // 新增耗材状态
+    let selectedConsumables = []; 
     let currentView = 'recent'; 
 
     const dateInput = document.getElementById('date');
@@ -188,7 +190,7 @@
     window.addEventListener('DOMContentLoaded', () => {
       renderPlatformButtons();
       renderDeviceButtons();
-      renderConsumableButtons(); // 初始化耗材按钮
+      renderConsumableButtons(); 
       loadBookings();
       dateInput.addEventListener('change', updateOptions);
     });
@@ -239,7 +241,6 @@
       updateOptions();
     }
 
-    // 新增耗材选择逻辑
     function toggleConsumable(id) {
       const idx = selectedConsumables.indexOf(id);
       if (idx >= 0) {
@@ -372,7 +373,7 @@
             name: r.name,
             phone: r.phone,
             devices: [],
-            consumables: [], // 初始化耗材列表
+            consumables: [], 
             ids: []
           };
         }
@@ -565,6 +566,7 @@
           document.getElementById('name').value = '';
           document.getElementById('phone').value = '';
           document.getElementById('note').value = '';
+          
           // 提交后清空耗材和设备的选中状态
           selectedDevices = [];
           selectedConsumables = [];
