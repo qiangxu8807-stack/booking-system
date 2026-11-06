@@ -58,13 +58,30 @@
     .record-right { text-align: right; display: flex; flex-direction: column; align-items: flex-end; gap: 8px; min-width: 100px; }
     .record-right .name { color: #1677ff; font-weight: 600; font-size: 15px; }
     .record-right .phone { color: #8c8c8c; font-size: 13px; letter-spacing: 0.5px; }
-    
-    .btn-cancel-rec { padding: 4px 12px; font-size: 12px; background: #fff; color: #ff4d4f; border: 1px solid #ffccc7; border-radius: 4px; cursor: pointer; transition: all 0.2s; margin-top: 4px; }
+
+    /* 🌟 新增：操作按钮和状态展示区域样式 */
+    .action-btns { display: flex; flex-direction: column; gap: 6px; margin-top: 4px; width: 100%; }
+    .btn-action { padding: 6px 12px; font-size: 12px; border-radius: 4px; cursor: pointer; transition: all 0.2s; width: 100%; white-space: nowrap; }
+    .btn-status { background: #e6f4ff; color: #0958d9; border: 1px solid #91caff; }
+    .btn-status:hover { background: #0958d9; color: #fff; border-color: #0958d9; }
+    .btn-cancel-rec { background: #fff; color: #ff4d4f; border: 1px solid #ffccc7; }
     .btn-cancel-rec:hover { background: #ff4d4f; color: #fff; border-color: #ff4d4f; }
+
+    .status-display { margin-top: 8px; padding: 10px; background: #fffbe6; border: 1px solid #ffe58f; border-radius: 6px; font-size: 12px; color: #d48806; text-align: left; width: 100%; line-height: 1.5; }
+    .status-display div { margin-bottom: 4px; }
+    .status-display div:last-child { margin-bottom: 0; }
 
     .empty { padding: 30px; text-align: center; color: #999; font-size: 14px; background: #fafafa; border-radius: 8px; border: 1px dashed #d9d9d9; }
     .hint { margin-top: 6px; font-size: 13px; color: #fa8c16; display: none; }
     .hint.show { display: block; }
+
+    /* 🌟 新增：弹窗样式 */
+    .modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); justify-content: center; align-items: center; z-index: 1000; }
+    .modal-content { background: #fff; padding: 24px; border-radius: 8px; width: 90%; max-width: 400px; box-shadow: 0 4px 12px rgba(0,0,0,0.15); }
+    .modal h3 { margin-top: 0; font-size: 18px; margin-bottom: 16px; color: #333; }
+    .modal-footer { display: flex; justify-content: flex-end; gap: 10px; margin-top: 24px; }
+    .btn-modal-cancel { background: #fff; color: #555; border: 1px solid #d9d9d9; padding: 8px 16px; border-radius: 6px; cursor: pointer; width: auto; margin-top: 0; font-size: 14px;}
+    .btn-modal-submit { background: #1677ff; color: #fff; border: 1px solid #1677ff; padding: 8px 16px; border-radius: 6px; cursor: pointer; width: auto; margin-top: 0; font-size: 14px;}
   </style>
 </head>
 <body>
@@ -126,6 +143,25 @@
     </div>
   </div>
 
+  <!-- 🌟 新增：填写状态弹窗 -->
+  <div class="modal" id="statusModal">
+    <div class="modal-content">
+      <h3>填写测试情况</h3>
+      <input type="hidden" id="status-ids">
+      
+      <label style="margin-top: 0;">设备状态</label>
+      <textarea id="status-device" rows="2" placeholder="例如：正常 / 功率下降 / 接口损坏"></textarea>
+      
+      <label>耗材状态</label>
+      <textarea id="status-consumable" rows="2" placeholder="例如：正常 / 探针折断 / 需校准"></textarea>
+
+      <div class="modal-footer">
+        <button class="btn-modal-cancel" onclick="closeStatusModal()">取消</button>
+        <button class="btn-modal-submit" onclick="submitStatus()">保存状态</button>
+      </div>
+    </div>
+  </div>
+
   <script>
     const PLATFORMS = [
       { id: '1-EC', name: '1-EC' },
@@ -141,8 +177,8 @@
       { id: 'lca-67g', name: '67G LCA(N4373E)' },
       { id: 'AWG', name: 'Keysight M8194A' },
       { id: 'lca-110g', name: '110G LCA' },
-      { id: 'edfa', name: 'EDFA (1550nm)' },
-      { id: 'edfa', name: 'EDFA (1620nm)' },
+      { id: 'edfa-1550', name: 'EDFA (1550nm)' }, // 修复了重复的 ID
+      { id: 'edfa-1620', name: 'EDFA (1620nm)' }, // 修复了重复的 ID
       { id: 'pdfa', name: 'PDFA(1310nm)' },
       { id: 'yoko-6370', name: 'Yokogawa 6370' },
       { id: 'yoko-6377', name: 'Yokogawa 6377' },
@@ -361,7 +397,7 @@
         return;
       }
 
-      // 🌟 数据聚合：按人、时间、平台合并，并聚合设备和耗材
+      // 🌟 数据聚合：按人、时间、平台合并，并聚合设备和耗材、状态
       const groupedMap = {};
       displayData.forEach(r => {
         const key = `${r.platform}_${r.date}_${r.time}_${r.name}_${r.phone}`;
@@ -374,7 +410,9 @@
             phone: r.phone,
             devices: [],
             consumables: [], 
-            ids: []
+            ids: [],
+            deviceStatus: '',
+            consumableStatus: ''
           };
         }
         
@@ -389,6 +427,10 @@
             }
           });
         }
+
+        // 提取状态信息
+        if (r.deviceStatus) groupedMap[key].deviceStatus = r.deviceStatus;
+        if (r.consumableStatus) groupedMap[key].consumableStatus = r.consumableStatus;
         
         groupedMap[key].ids.push(r.id);
       });
@@ -427,11 +469,23 @@
                       <span class="label">时间</span>
                       <span class="value" style="color: #555; font-weight: normal;">${r.date} ${r.time}</span>
                     </div>
+
+                    ${(r.deviceStatus || r.consumableStatus) ? `
+                      <div class="status-display">
+                        ${r.deviceStatus ? `<div><b>设备状态：</b>${r.deviceStatus}</div>` : ''}
+                        ${r.consumableStatus ? `<div><b>耗材状态：</b>${r.consumableStatus}</div>` : ''}
+                      </div>
+                    ` : ''}
+
                   </div>
                   <div class="record-right">
                     <div class="name">${r.name || '-'}</div>
                     <div class="phone">${r.phone || ''}</div>
-                    <button class="btn-cancel-rec" onclick="cancelBooking('${r.ids.join(',')}', '${r.name}')">取消预约</button>
+                    
+                    <div class="action-btns">
+                      <button class="btn-action btn-status" onclick="openStatusModal('${r.ids.join(',')}')">填写状态</button>
+                      <button class="btn-action btn-cancel-rec" onclick="cancelBooking('${r.ids.join(',')}', '${r.name}')">取消预约</button>
+                    </div>
                   </div>
                 </div>
               `).join('')}
@@ -441,6 +495,55 @@
       });
 
       listEl.innerHTML = html;
+    }
+
+    // 🌟 打开状态弹窗
+    function openStatusModal(idsStr) {
+      const firstId = idsStr.split(',')[0];
+      const record = bookedData.find(i => i.id === firstId);
+      
+      document.getElementById('status-ids').value = idsStr;
+      document.getElementById('status-device').value = record ? (record.deviceStatus || '') : '';
+      document.getElementById('status-consumable').value = record ? (record.consumableStatus || '') : '';
+      
+      document.getElementById('statusModal').style.display = 'flex';
+    }
+
+    function closeStatusModal() {
+      document.getElementById('statusModal').style.display = 'none';
+    }
+
+    // 🌟 提交状态更新
+    async function submitStatus() {
+      const idsStr = document.getElementById('status-ids').value;
+      const deviceStatus = document.getElementById('status-device').value.trim();
+      const consumableStatus = document.getElementById('status-consumable').value.trim();
+      
+      const ids = idsStr.split(',');
+      
+      // 批量更新内存中对应记录的字段
+      ids.forEach(id => {
+        const idx = bookedData.findIndex(i => i.id === id);
+        if (idx >= 0) {
+          bookedData[idx].deviceStatus = deviceStatus;
+          bookedData[idx].consumableStatus = consumableStatus;
+        }
+      });
+
+      try {
+        const res = await fetch(API_URL, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(bookedData)
+        });
+        if (!res.ok) throw new Error('保存失败');
+        
+        closeStatusModal();
+        showMsg('状态已更新成功', 'success');
+        loadBookings();
+      } catch (e) {
+        showMsg('网络错误，保存失败', 'error');
+      }
     }
 
     async function cancelBooking(idsStr, name) {
